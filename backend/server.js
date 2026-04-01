@@ -64,7 +64,7 @@ app.use(rateLimit({
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://your-music-app.vercel.app",
+  "https://from-the-heart-v1.vercel.app",
 ];
 
 app.use(cors({
