@@ -1,14 +1,13 @@
 import axios from 'axios';
 
-
-const baseURL = `${process.env.NEXT_PUBLIC_API_URL}/api/v1`;
-
-console.log("NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
-console.log("Axios baseURL:", baseURL);
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || 'https://fromtheheart-production-e892.up.railway.app')
+  .replace(/\/$/, '');
+const baseURL = `${apiOrigin}/api/v1`;
 
 const api = axios.create({
   baseURL,
   withCredentials: true,
+  timeout: 20000,
 });
 
 api.interceptors.request.use(
