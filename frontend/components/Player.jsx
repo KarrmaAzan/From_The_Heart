@@ -1,375 +1,254 @@
-import { useState, useRef, useEffect, useContext } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   Box,
   IconButton,
   Slider,
+  Tooltip,
   Typography,
+  alpha,
   useMediaQuery,
 } from "@mui/material";
 import {
-  PlayArrow,
-  Pause,
-  SkipNext,
-  SkipPrevious,
-  Shuffle,
-  Repeat,
-  RepeatOne,
+  GraphicEqRounded,
+  PauseRounded,
+  PlayArrowRounded,
+  RepeatOneRounded,
+  RepeatRounded,
+  ShuffleRounded,
+  SkipNextRounded,
+  SkipPreviousRounded,
+  VolumeUpRounded,
 } from "@mui/icons-material";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
-import styled from "styled-components";
 import { PlayerContext } from "../context/PlayerContext";
 import api from "../utils/api";
 
-const PlayerContainer = styled(Box)`
-  position: fixed;
-  bottom: ${(props) => (props.$isMobile ? "80px" : "0")};
-  left: 0;
-  width: 100vw;
-  height: ${(props) => (props.$isMobile ? "60px" : "100px")};
-  background-color: #1e1e1e;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: ${(props) => (props.$isMobile ? "10px 15px" : "10px 20px")};
-  box-sizing: border-box;
-  overflow: hidden;
-  margin-bottom: -20px;
-`;
-
-const TopSection = styled(Box)`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  flex: 1;
-  position: relative;
-`;
-
-const LeftSection = styled(Box)`
-  display: flex;
-  align-items: center;
-  flex: 1;
-  overflow: hidden;
-`;
-
-const CenterSection = styled(Box)`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-`;
-
-const RightSection = styled(Box)`
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 1;
-`;
-
-const SongDetails = styled(Box)`
-  display: flex;
-  align-items: center;
-  gap: 25px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const AlbumCover = styled.img`
-  width: 50px;
-  height: 50px;
-  border-radius: 8px;
-  object-fit: cover;
-  flex-shrink: 0;
-`;
-
-const Controls = styled(Box)`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-`;
-
-const DurationBar = styled(Slider)`
-  ${(props) =>
-    props.$isMobile
-      ? `
-    position: absolute;
-    top: 2.2rem;
-    left: 0;
-    right: 0;
-    margin: 0;
-    & .MuiSlider-thumb {
-      display: none;
-    }
-  `
-      : `
-    width: 70%;
-    margin: 5px auto;
-    bottom: 8px;
-  `}
-`;
+const controlButtonSx = {
+  color: "text.secondary",
+  "&:hover": { color: "text.primary", bgcolor: alpha("#FFFFFF", 0.07) },
+};
 
 export default function Player() {
   const { currentTrack, setCurrentTrack, queue } = useContext(PlayerContext);
-
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(50);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [repeatMode, setRepeatMode] = useState(0); // 0 off, 1 one, 2 all
+  const [repeatMode, setRepeatMode] = useState(0);
   const [shuffling, setShuffling] = useState(false);
   const [hasCounted, setHasCounted] = useState(false);
-
   const audioRef = useRef(null);
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width:768px)");
 
   const streamBaseUrl =
-    typeof window !== "undefined" && window.location.hostname.includes("localhost")
-      ? "http://localhost:5000"
-      : "https://karrmas-heart.onrender.com";
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://fromtheheart-production-e892.up.railway.app";
+
+  const playNext = () => {
+    if (!queue?.length || !currentTrack) return;
+    const currentIndex = queue.findIndex((track) => track._id === currentTrack._id);
+    if (shuffling) {
+      setCurrentTrack(queue[Math.floor(Math.random() * queue.length)]);
+      return;
+    }
+    if (currentIndex === -1) {
+      setCurrentTrack(queue[0]);
+      return;
+    }
+    const nextIndex = repeatMode === 2
+      ? (currentIndex + 1) % queue.length
+      : Math.min(currentIndex + 1, queue.length - 1);
+    if (nextIndex === currentIndex && repeatMode !== 2) {
+      setPlaying(false);
+      return;
+    }
+    setCurrentTrack(queue[nextIndex]);
+  };
 
   useEffect(() => {
-    if (currentTrack && audioRef.current) {
-      const isCloudinary = currentTrack.fileUrl?.includes("res.cloudinary.com");
-      const src = isCloudinary
-        ? currentTrack.fileUrl
-        : `${streamBaseUrl}/api/v1/music/stream/${currentTrack._id}`;
-
-      audioRef.current.src = src;
-      audioRef.current.load();
-      audioRef.current.play().catch((err) => console.error("Playback failed:", err));
-
-      setPlaying(true);
-      setHasCounted(false);
-    }
+    if (!currentTrack || !audioRef.current) return;
+    const isCloudinary = currentTrack.fileUrl?.includes("res.cloudinary.com");
+    audioRef.current.src = isCloudinary
+      ? currentTrack.fileUrl
+      : `${streamBaseUrl}/api/v1/music/stream/${currentTrack._id}`;
+    audioRef.current.load();
+    audioRef.current.play().catch((error) => console.error("Playback failed:", error));
+    setPlaying(true);
+    setHasCounted(false);
   }, [currentTrack, streamBaseUrl]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
-    }
+    if (audioRef.current) audioRef.current.volume = volume / 100;
   }, [volume]);
 
   useEffect(() => {
-    const audioEl = audioRef.current;
-    if (!audioEl) return;
+    const audio = audioRef.current;
+    if (!audio) return undefined;
 
     const updateProgress = () => {
-      setCurrentTime(audioEl.currentTime);
-      setDuration(audioEl.duration || 0);
-
-      if (audioEl.currentTime >= 10 && !hasCounted) {
-        incrementPlayCount();
+      setCurrentTime(audio.currentTime);
+      setDuration(audio.duration || 0);
+      if (audio.currentTime >= 10 && !hasCounted && currentTrack?._id) {
+        api.patch(`/music/increment-playcount/${currentTrack._id}`).catch((error) => {
+          console.error("Error incrementing play count:", error);
+        });
         setHasCounted(true);
       }
     };
 
     const handleEnded = () => {
       if (repeatMode === 1) {
-        audioEl.currentTime = 0;
-        audioEl.play();
-        return;
-      }
-
-      if (queue.length > 0) {
+        audio.currentTime = 0;
+        audio.play();
+      } else {
         playNext();
       }
     };
 
-    audioEl.addEventListener("timeupdate", updateProgress);
-    audioEl.addEventListener("loadedmetadata", updateProgress);
-    audioEl.addEventListener("ended", handleEnded);
-
+    audio.addEventListener("timeupdate", updateProgress);
+    audio.addEventListener("loadedmetadata", updateProgress);
+    audio.addEventListener("ended", handleEnded);
     return () => {
-      audioEl.removeEventListener("timeupdate", updateProgress);
-      audioEl.removeEventListener("loadedmetadata", updateProgress);
-      audioEl.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("timeupdate", updateProgress);
+      audio.removeEventListener("loadedmetadata", updateProgress);
+      audio.removeEventListener("ended", handleEnded);
     };
-  }, [currentTrack, hasCounted, queue, repeatMode]);
-
-  const incrementPlayCount = async () => {
-    try {
-      if (!currentTrack?._id) return;
-      await api.patch(`/music/increment-playcount/${currentTrack._id}`);
-    } catch (error) {
-      console.error("Error incrementing play count:", error.response?.data || error.message);
-    }
-  };
+  });
 
   const formatTime = (time) => {
-    if (isNaN(time) || time < 0) return "0:00";
+    if (!Number.isFinite(time) || time < 0) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const togglePlay = () => {
-    if (!currentTrack) return;
-
-    if (playing) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-
-    setPlaying(!playing);
-  };
-
-  const playNext = () => {
-    if (!queue || queue.length === 0 || !currentTrack) return;
-
-    const currentIndex = queue.findIndex((track) => track._id === currentTrack._id);
-
-    if (shuffling) {
-      const randomIndex = Math.floor(Math.random() * queue.length);
-      setCurrentTrack(queue[randomIndex]);
-      return;
-    }
-
-    if (currentIndex === -1) {
-      setCurrentTrack(queue[0]);
-      return;
-    }
-
-    const nextIndex =
-      repeatMode === 2
-        ? (currentIndex + 1) % queue.length
-        : Math.min(currentIndex + 1, queue.length - 1);
-
-    if (nextIndex === currentIndex && repeatMode !== 2) {
-      setPlaying(false);
-      return;
-    }
-
-    setCurrentTrack(queue[nextIndex]);
+    if (!currentTrack || !audioRef.current) return;
+    if (playing) audioRef.current.pause();
+    else audioRef.current.play();
+    setPlaying((value) => !value);
   };
 
   const playPrevious = () => {
-    if (!queue || queue.length === 0 || !currentTrack) return;
-
+    if (!queue?.length || !currentTrack) return;
     const currentIndex = queue.findIndex((track) => track._id === currentTrack._id);
-
-    if (currentIndex <= 0) {
-      setCurrentTrack(queue[0]);
-      return;
-    }
-
-    setCurrentTrack(queue[currentIndex - 1]);
+    setCurrentTrack(queue[Math.max(0, currentIndex - 1)] || queue[0]);
   };
 
-  const toggleRepeat = () => {
-    setRepeatMode((prev) => (prev + 1) % 3);
-  };
-
-  const toggleShuffle = () => {
-    setShuffling((prev) => !prev);
-  };
-
-  const coverSrc =
-    currentTrack?.album?.coverImage || currentTrack?.albumCover || "/iam.jpeg";
-
+  const coverSrc = currentTrack?.album?.coverImage || currentTrack?.albumCover || "/iam.jpeg";
   const artistName =
     currentTrack?.artist?.name ||
     currentTrack?.artistName ||
-    (typeof currentTrack?.artist === "string" ? currentTrack.artist : "Artist Unknown");
+    (typeof currentTrack?.artist === "string" ? currentTrack.artist : "Artist unknown");
+
+  const seek = (_, value) => {
+    if (audioRef.current) audioRef.current.currentTime = value;
+  };
 
   return (
-    <PlayerContainer $isMobile={isMobile}>
+    <Box
+      component="aside"
+      aria-label="Music player"
+      sx={{
+        position: "fixed",
+        zIndex: 1240,
+        left: { xs: 10, md: "50%" },
+        right: { xs: 10, md: "auto" },
+        bottom: { xs: 84, md: 16 },
+        transform: { md: "translateX(-50%)" },
+        width: { md: "min(1080px, calc(100vw - 40px))" },
+        minHeight: { xs: 68, md: 88 },
+        px: { xs: 1, md: 1.5 },
+        py: { xs: 0.75, md: 1 },
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr auto", md: "minmax(220px, 1fr) minmax(360px, 1.35fr) minmax(170px, 1fr)" },
+        alignItems: "center",
+        gap: { xs: 1, md: 2 },
+        borderRadius: { xs: 3, md: 4 },
+        bgcolor: alpha("#171517", 0.94),
+        backdropFilter: "blur(26px)",
+        border: "1px solid",
+        borderColor: alpha("#FFFFFF", 0.11),
+        boxShadow: "0 22px 70px rgba(0,0,0,.58)",
+      }}
+    >
       <audio ref={audioRef} />
+
+      <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", gap: 1.25 }}>
+        <Box
+          sx={{
+            width: { xs: 50, md: 62 },
+            height: { xs: 50, md: 62 },
+            flex: "0 0 auto",
+            borderRadius: 2.2,
+            overflow: "hidden",
+            bgcolor: alpha("#FFFFFF", 0.05),
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          {currentTrack ? (
+            <Box component="img" src={coverSrc} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <GraphicEqRounded sx={{ color: "primary.main" }} />
+          )}
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography fontWeight={750} noWrap sx={{ fontSize: { xs: 13, md: 15 } }}>
+            {currentTrack?.title || "Choose something to play"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {currentTrack ? artistName : "Your next favorite track is waiting"}
+          </Typography>
+        </Box>
+      </Box>
 
       {isMobile ? (
         <>
-          <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-            <Box>{currentTrack && <AlbumCover src={coverSrc} alt="Album" />}</Box>
-            <Box flex={1} display="flex" justifyContent="center">
-              <Typography variant="body1" color="white">
-                {currentTrack ? currentTrack.title : "No Song Playing"}
-              </Typography>
-            </Box>
-            <Box>
-              <IconButton onClick={togglePlay} color="secondary">
-                {playing ? <Pause fontSize="large" /> : <PlayArrow fontSize="large" />}
-              </IconButton>
-            </Box>
-          </Box>
-          <DurationBar
-            $isMobile={isMobile}
+          <IconButton aria-label={playing ? "Pause" : "Play"} onClick={togglePlay} disabled={!currentTrack} sx={{ width: 46, height: 46, bgcolor: "primary.main", color: "#09090b", "&:hover": { bgcolor: "primary.light" } }}>
+            {playing ? <PauseRounded /> : <PlayArrowRounded />}
+          </IconButton>
+          <Slider
             value={currentTime}
             min={0}
             max={duration || 1}
-            onChange={(e, v) => {
-              audioRef.current.currentTime = v;
-            }}
+            onChange={seek}
+            aria-label="Track progress"
+            sx={{ position: "absolute", inset: "auto 12px 1px", width: "calc(100% - 24px)", p: 0, "& .MuiSlider-thumb": { display: "none" }, "& .MuiSlider-rail": { opacity: 0.25 } }}
           />
         </>
       ) : (
         <>
-          <TopSection>
-            <LeftSection>
-              <SongDetails>
-                {currentTrack && <AlbumCover src={coverSrc} alt="Album" />}
-                <Box>
-                  <Typography variant="body1" color="white">
-                    {currentTrack ? currentTrack.title : "No Song Playing"}
-                  </Typography>
-                  <Typography variant="body2" color="gray">
-                    {artistName}
-                  </Typography>
-                </Box>
-              </SongDetails>
-            </LeftSection>
+          <Box>
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 0.6 }}>
+              <Tooltip title="Shuffle">
+                <IconButton aria-label="Shuffle" onClick={() => setShuffling((value) => !value)} sx={{ ...controlButtonSx, color: shuffling ? "primary.main" : "text.secondary" }}>
+                  <ShuffleRounded fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <IconButton aria-label="Previous track" onClick={playPrevious} sx={controlButtonSx}><SkipPreviousRounded /></IconButton>
+              <IconButton aria-label={playing ? "Pause" : "Play"} onClick={togglePlay} disabled={!currentTrack} sx={{ width: 44, height: 44, mx: 0.3, bgcolor: "primary.main", color: "#09090b", "&:hover": { bgcolor: "primary.light", transform: "scale(1.04)" } }}>
+                {playing ? <PauseRounded /> : <PlayArrowRounded />}
+              </IconButton>
+              <IconButton aria-label="Next track" onClick={playNext} sx={controlButtonSx}><SkipNextRounded /></IconButton>
+              <Tooltip title={repeatMode === 1 ? "Repeat one" : repeatMode === 2 ? "Repeat all" : "Repeat off"}>
+                <IconButton aria-label="Change repeat mode" onClick={() => setRepeatMode((value) => (value + 1) % 3)} sx={{ ...controlButtonSx, color: repeatMode ? "primary.main" : "text.secondary" }}>
+                  {repeatMode === 1 ? <RepeatOneRounded fontSize="small" /> : <RepeatRounded fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Box sx={{ display: "grid", gridTemplateColumns: "34px 1fr 34px", alignItems: "center", gap: 1 }}>
+              <Typography variant="caption" color="text.secondary">{formatTime(currentTime)}</Typography>
+              <Slider value={currentTime} min={0} max={duration || 1} onChange={seek} size="small" aria-label="Track progress" sx={{ "& .MuiSlider-thumb": { width: 10, height: 10 }, "& .MuiSlider-rail": { opacity: 0.25 } }} />
+              <Typography variant="caption" color="text.secondary" textAlign="right">{formatTime(duration)}</Typography>
+            </Box>
+          </Box>
 
-            <CenterSection>
-              <Controls>
-                <IconButton onClick={toggleShuffle} color={shuffling ? "secondary" : "default"}>
-                  <Shuffle fontSize="large" />
-                </IconButton>
-                <IconButton onClick={playPrevious}>
-                  <SkipPrevious fontSize="large" />
-                </IconButton>
-                <IconButton onClick={togglePlay} color="secondary">
-                  {playing ? <Pause fontSize="large" /> : <PlayArrow fontSize="large" />}
-                </IconButton>
-                <IconButton onClick={playNext}>
-                  <SkipNext fontSize="large" />
-                </IconButton>
-                <IconButton onClick={toggleRepeat} color={repeatMode !== 0 ? "secondary" : "default"}>
-                  {repeatMode === 1 ? <RepeatOne fontSize="large" /> : <Repeat fontSize="large" />}
-                </IconButton>
-              </Controls>
-            </CenterSection>
-
-            <RightSection>
-              <Box display="flex" alignItems="center">
-                <VolumeUpIcon color="secondary" sx={{ marginRight: "8px" }} />
-                <Slider
-                  value={volume}
-                  onChange={(e, v) => setVolume(v)}
-                  sx={{ width: 100, color: "secondary.main", right: 5 }}
-                />
-              </Box>
-            </RightSection>
-          </TopSection>
-
-          <Box width="100%" display="flex" alignItems="center">
-            <Typography variant="body2" color="gray" sx={{ marginLeft: 2, position: "relative", bottom: "6px" }}>
-              {formatTime(currentTime)}
-            </Typography>
-            <DurationBar
-              value={currentTime}
-              min={0}
-              max={duration || 1}
-              onChange={(e, v) => {
-                audioRef.current.currentTime = v;
-              }}
-            />
-            <Typography variant="body2" color="gray" sx={{ marginRight: 2, position: "relative", bottom: "6px" }}>
-              {formatTime(duration)}
-            </Typography>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
+            <VolumeUpRounded sx={{ fontSize: 19, color: "text.secondary" }} />
+            <Slider value={volume} onChange={(_, value) => setVolume(value)} aria-label="Volume" sx={{ width: 92, "& .MuiSlider-thumb": { width: 10, height: 10 }, "& .MuiSlider-rail": { opacity: 0.25 } }} />
           </Box>
         </>
       )}
-    </PlayerContainer>
+    </Box>
   );
 }

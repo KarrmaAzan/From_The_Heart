@@ -1,15 +1,21 @@
 import dynamic from "next/dynamic";
-import { Container } from "@mui/material";
+import { Box } from "@mui/material";
 
 const Navbar = dynamic(() => import("./Navbar"), { ssr: false });
 
 export default function Layout({ children }) {
   return (
-    <>
+    <Box sx={{ minHeight: "100vh" }}>
       <Navbar />
-      <Container sx={{ marginTop: 1 }}>
+      <Box
+        component="main"
+        sx={{
+          width: "100%",
+          pb: { xs: "176px", md: "132px" },
+        }}
+      >
         {children}
-      </Container>
-    </>
+      </Box>
+    </Box>
   );
 }

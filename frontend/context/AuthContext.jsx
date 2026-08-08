@@ -10,6 +10,7 @@ export default function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true); // ✅ Added loading state
 
+  /* eslint-disable react-hooks/set-state-in-effect -- localStorage is only available after client hydration. */
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
@@ -19,6 +20,7 @@ export default function AuthProvider({ children }) {
     }
     setLoading(false); // ✅ Done loading
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = (userData) => {
     localStorage.setItem('user', JSON.stringify(userData));
